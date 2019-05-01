@@ -12,13 +12,6 @@ MOSES_NORM=${MOSES_SCRIPT_DIR}/tokenizer/normalize-punctuation.perl
 pushd ${DATA_DIR}
 for lang in de en
 do
-    test_file=test.$lang
-    if [ -f $test_file ]
-    then
-        cat $test_file | perl -pE 's/(\^M|\r)//g' > $TMP/$test_file
-        mv $TMP/$test_file .
-    fi
-
     for corpus in train dev test
     do
         corp_file=$corpus.$lang
