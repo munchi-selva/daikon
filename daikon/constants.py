@@ -17,11 +17,14 @@ EOS = '<eos>'
 BOS = EOS
 UNK = '<unk>'
 
-# default names of files
+# default names of files and directories
 MODEL_FILENAME = 'model'
 SOURCE_VOCAB_FILENAME = 'vocab.source.json'
 TARGET_VOCAB_FILENAME = 'vocab.target.json'
 TRAINING_LOG_FILENAME = 'training.log'
+
+# directory housing model for checking performance on validation data
+VALIDATION_MODEL_DIR = 'val'
 
 # max number of tokens per sequence, sentences that are
 # longer than that are discarded for training
@@ -43,6 +46,13 @@ EMBEDDING_SIZE = 512
 HIDDEN_SIZE = 1024
 
 LEARNING_RATE = 0.0001
+
+# epochs between validation data performance checks
+VAL_EPOCHS = 1
+
+# numer of models with no validation data performance improvement before
+# training terminates
+PATIENCE = 5
 
 # log training progress every X batches
 LOGGING_INTERVAL = 1000

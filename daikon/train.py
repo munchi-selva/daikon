@@ -16,12 +16,14 @@ import numpy as np
 import tensorflow as tf
 
 from typing import List
+from multiprocessing.pool import ThreadPool
 
 from daikon import reader
 from daikon import constants as C
 from daikon.vocab import create_vocab, Vocabulary
 from daikon.translate import translate_lines
 from daikon.compgraph import define_computation_graph
+from daikon.score import score
 
 logger = logging.getLogger(__name__)
 
@@ -59,13 +61,25 @@ def train(source_data: str,
           save_to: str,
           log_to: str,
           sample_after_epoch: bool,
+          source_val_data: str = None,
+          target_val_data: str = None,
+          val_epochs: int = C.VAL_EPOCHS,
+          patience: int = C.PATIENCE,
           **kwargs) -> None:
-    """Trains a language model. See argument description in `bin/romanesco`."""
+    """Trains a translation model. See argument description in `bin/daikon`."""
+
+    # enable early stopping if validation data files were specified
+    early_stopping = source_val_data is not None and target_val_data is not None
 
     # create folders for model and logs if they don't exist yet
     for folder in [save_to, log_to]:
         if not os.path.exists(folder):
             os.makedirs(folder)
+
+    if early_stopping:
+        val_model_dir = os.path.join(save_to, C.VALIDATION_MODEL_DIR)
+        if not os.path.exists(val_model_dir):
+            os.makedirs(val_model_dir)
 
     logger.info("Creating vocabularies.")
 
@@ -75,6 +89,12 @@ def train(source_data: str,
 
     logger.info("Source vocabulary: %s", source_vocab)
     logger.info("Target vocabulary: %s", target_vocab)
+
+    if early_stopping:
+        # create copies of vocabulary files used for checking validation
+        # data performance
+        source_vocab.save(os.path.join(val_model_dir, C.SOURCE_VOCAB_FILENAME))
+        target_vocab.save(os.path.join(val_model_dir, C.TARGET_VOCAB_FILENAME))
 
     # convert training data to list of word ids
     logger.info("Reading training data.")
@@ -97,6 +117,11 @@ def train(source_data: str,
         logger.info("Starting training.")
         tic = time.time()
         num_batches = math.floor(len(reader_ids) / batch_size)
+
+        if early_stopping:
+            # initialize metrics for checking validation data performance
+            best_val_loss = float("inf")
+            epochs_without_improvement = 0
 
         # iterate over training data `epochs` times
         for epoch in range(1, epochs + 1):
@@ -122,7 +147,32 @@ def train(source_data: str,
                     iter_tic = time.time()
             perplexity = np.exp(total_loss / total_iter)
             logger.info("Perplexity on training data after epoch %s: %.2f", epoch, perplexity)
-            saver.save(session, os.path.join(save_to, C.MODEL_FILENAME))
+
+            save_model = True
+            if early_stopping and epoch % val_epochs == 0:
+                # save a copy of the current model that can be used to check
+                # its performance for the validation data
+                saver.save(session, os.path.join(val_model_dir, C.MODEL_FILENAME))
+
+                # spin off a thread to call score() for the validation data
+                threadPool = ThreadPool(processes = 1)
+                scoreRes = threadPool.apply_async(score, (source_val_data, target_val_data, val_model_dir, True, False))
+                latest_val_loss = scoreRes.get()
+                logging.info("Current model perplexity on validation data: %.2f", latest_val_loss)
+
+                if latest_val_loss < best_val_loss:
+                    logging.info("Lowest perplexity on validation data achieved")
+                    best_val_loss = latest_val_loss
+                    epochs_without_improvement = 0
+                else:
+                    save_model = False
+                    epochs_without_improvement += 1
+                    if epochs_without_improvement >= patience:
+                        logging.info("No improvement in validation data perplexity for %d epochs: terminating training", epochs_without_improvement) 
+                        return
+
+            if save_model:
+                saver.save(session, os.path.join(save_to, C.MODEL_FILENAME))
 
             if sample_after_epoch:
                 # sample from model after epoch

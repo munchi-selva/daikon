@@ -46,6 +46,14 @@ def get_argument_parser():
                        help='the folder to store log files. Use for monitoring with tensorboard. (default: %(default)s)')
     train.add_argument('-s', '--sample_after_epoch', default=False, action="store_true",
                        help='Sample translations from the model after each epoch. (default: %(default)s)')
+    train.add_argument('--source_val_data', default=None,
+                       help='the source validation data, a tokenized, plain text file. Target validation data must also be provided. Training will stop before maximum training epochs if model stops improving on validation data.')
+    train.add_argument('--target_val_data', default=None,
+                       help='the target validation data, a tokenized, plain text file. Source validation data must also be provided. Training will stop before maximum training epochs if model stops improving on validation data.')
+    train.add_argument('--val_epochs', default=C.VAL_EPOCHS,
+                       help='How regularly (in training epochs) model performance is checked against validation data. (default: %(default)s)')
+    train.add_argument('-p', '--patience', default=C.PATIENCE,
+                       help='Number of models that show no improvement on validation data before training is stopped. (default: %(default)s)')
 
     # translate
     sample = subparsers.add_parser('translate', help='Use a trained model to translate new text.')
