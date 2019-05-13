@@ -19,6 +19,7 @@ UNK = '<unk>'
 
 # default names of files and directories
 MODEL_FILENAME = 'model'
+MODEL_CHECKPOINT = 'checkpoint'
 SOURCE_VOCAB_FILENAME = 'vocab.source.json'
 TARGET_VOCAB_FILENAME = 'vocab.target.json'
 TRAINING_LOG_FILENAME = 'training.log'

@@ -16,6 +16,7 @@ import numpy as np
 import tensorflow as tf
 
 from typing import List
+
 from multiprocessing.pool import ThreadPool
 
 from daikon import reader
@@ -65,6 +66,7 @@ def train(source_data: str,
           target_val_data: str = None,
           val_epochs: int = C.VAL_EPOCHS,
           patience: int = C.PATIENCE,
+          overwrite: bool = False,
           **kwargs) -> None:
     """Trains a translation model. See argument description in `bin/daikon`."""
 
@@ -81,14 +83,27 @@ def train(source_data: str,
         if not os.path.exists(val_model_dir):
             os.makedirs(val_model_dir)
 
-    logger.info("Creating vocabularies.")
+    # create a new graph if the overwrite option is enabled or there is no
+    # existing model in the save_to directory
+    checkpoint_file = os.path.join(save_to, C.MODEL_CHECKPOINT)
+    initialize_graph = overwrite or not os.path.exists(checkpoint_file)
 
-    # create vocabulary to map words to ids, for source and target
-    source_vocab = create_vocab(source_data, source_vocab_max_size, save_to, C.SOURCE_VOCAB_FILENAME)
-    target_vocab = create_vocab(target_data, target_vocab_max_size, save_to, C.TARGET_VOCAB_FILENAME)
+    source_vocab = Vocabulary()
+    target_vocab = Vocabulary()
 
-    logger.info("Source vocabulary: %s", source_vocab)
-    logger.info("Target vocabulary: %s", target_vocab)
+    if not initialize_graph:
+        # load existing vocabulary that maps words to ids, for source and target
+        logger.info("Loading vocabularies.")
+        source_vocab.load(os.path.join(save_to, C.SOURCE_VOCAB_FILENAME))
+        target_vocab.load(os.path.join(save_to, C.TARGET_VOCAB_FILENAME))
+    else:
+        # create vocabulary to map words to ids, for source and target
+        logger.info("Creating vocabularies.")
+        source_vocab = create_vocab(source_data, source_vocab_max_size, save_to, C.SOURCE_VOCAB_FILENAME)
+        target_vocab = create_vocab(target_data, target_vocab_max_size, save_to, C.TARGET_VOCAB_FILENAME)
+
+        logger.info("Source vocabulary: %s", source_vocab)
+        logger.info("Target vocabulary: %s", target_vocab)
 
     if early_stopping:
         # create copies of vocabulary files used for checking validation
@@ -109,8 +124,13 @@ def train(source_data: str,
     saver = tf.train.Saver()
 
     with tf.Session() as session:
-        # init
-        session.run(tf.global_variables_initializer())
+        if initialize_graph:
+            # init
+            session.run(tf.global_variables_initializer())
+        else:
+            # load/restore model for further training
+            saver.restore(session, os.path.join(save_to, C.MODEL_FILENAME))
+
         # write logs (@tensorboard)
         summary_writer = tf.summary.FileWriter(log_to, graph=tf.get_default_graph())
 
