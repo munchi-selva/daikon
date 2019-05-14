@@ -45,7 +45,8 @@ def translate_line(session: tf.Session,
     Translates one single input string.
     """
 
-    source_ids = np.array(source_vocab.get_ids(line.split())).reshape(1, -1)
+    # reverse the input sequence before feeding it into the translation graph
+    source_ids = np.array(source_vocab.get_ids(line.split())[::-1]).reshape(1, -1)
 
     translated_ids = []  # type: List[int]
 

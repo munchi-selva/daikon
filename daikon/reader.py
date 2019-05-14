@@ -185,7 +185,8 @@ def iterate(reader_ids: List[ReaderTuple], batch_size: int, shuffle: bool = True
         max_len_in_source = max([len(s) for s in source_slice])
         max_len_in_target = max([len(s) for s in decoder_targets])
 
-        encoder_inputs = [pad_sequence(ids, C.PAD_ID, max_len_in_source) for ids in source_slice]
+        # reverse the input sequence before padding it
+        encoder_inputs = [pad_sequence(ids[::-1], C.PAD_ID, max_len_in_source) for ids in source_slice]
         decoder_inputs = [pad_sequence(ids, C.PAD_ID, max_len_in_target) for ids in decoder_inputs]
         decoder_targets = [pad_sequence(ids, C.PAD_ID, max_len_in_target) for ids in decoder_targets]
 
